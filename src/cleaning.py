@@ -123,6 +123,23 @@ class SchemaType:
         # Should the output format be in lowercase
         lower: bool = False
 
+    @dataclass
+    class Phone(_Base):
+        # The separator between pairs in the number
+        separator: Literal["-", " ", ""] = "-"
+
+        # Should the output has country code
+        include_country_code: bool = True
+
+    @dataclass
+    class Email(_Base):
+        pass
+
+    @dataclass
+    class Enum(String):
+        # The possible values for the enum
+        values: List[str]
+
 
 # For easy access using python modules
 Auto = SchemaType.Auto
@@ -388,6 +405,18 @@ def _get_gender_cleaner(schema_type: SchemaType.Datetime) -> callable:
     return lambda col: cleaner_udf(col).cast("string")
 
 
+def _get_phone_cleaner(schema_type: SchemaType.Datetime) -> callable:
+    return _get_string_cleaner(SchemaType.String())
+
+
+def _get_email_cleaner(schema_type: SchemaType.Email) -> callable:
+    return _get_string_cleaner(SchemaType.String())
+
+
+def _get_enum_cleaner(schema_type: SchemaType.Enum) -> callable:
+    return _get_string_cleaner(SchemaType.String())
+
+
 def _get_col_cleaner(schema_type: SchemaTypeUnion) -> callable:
 
     if isinstance(schema_type, SchemaType.Auto):
@@ -419,6 +448,15 @@ def _get_col_cleaner(schema_type: SchemaTypeUnion) -> callable:
 
     if isinstance(schema_type, SchemaType.Gender):
         return _get_gender_cleaner(schema_type)
+
+    if isinstance(schema_type, SchemaType.Phone):
+        return _get_phone_cleaner(schema_type)
+
+    if isinstance(schema_type, SchemaType.Email):
+        return _get_email_cleaner(schema_type)
+
+    if isinstance(schema_type, SchemaType.Enum):
+        return _get_enum_cleaner(schema_type)
 
     return None
 

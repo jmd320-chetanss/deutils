@@ -5,6 +5,7 @@ import pyspark.sql.functions as spf
 from dateutil import parser
 from datetime import date, datetime
 from dataclasses import dataclass, field
+import wordninja
 
 from . import logs
 from . import string_utils
@@ -516,7 +517,7 @@ def clean_table(
     logs.log_success("Checking for key columns done.")
 
     # -----------------------------------------------------------------------------------------------------
-    # Cleaning column names
+    # Renaming columns
     # -----------------------------------------------------------------------------------------------------
 
     logs.log_info("Renaming columns...")
@@ -524,12 +525,18 @@ def clean_table(
     rename_mapping = dict()
 
     for col in df.columns:
+
+        # Calculate new name for the column
         schema_type = schema.get(col, default_data_type)
         if schema_type is not None and schema_type.rename_to is not None:
             new_name = schema_type.rename_to
         else:
-            new_name = string_utils.to_snake_case(col)
+            words = wordninja.split(col)
+            new_name = "_".join(words)
+            new_name = string_utils.to_snake_case(new_name)
 
+        # Register new name for renaming only if it is different than what it already is,
+        # no need to clutter up the rename mapping and logs
         if new_name != col:
             logs.log_info(f"Renaming column '{col}' to '{new_name}'...")
             rename_mapping[col] = new_name

@@ -10,6 +10,7 @@ def calculate(
     target_df: DataFrame | ConnectDataFrame | None,
     key_cols: list[str],
     log_analytics: bool = True,
+    current_datetime: datetime = datetime.now(),
 ):
     """
     Generates an SCD2 table from the source and target dataframes.
@@ -41,7 +42,6 @@ def calculate(
     special_cols = ["_effective_from", "_effective_to", "_reason", "_active"]
     all_cols = [col for col in source_df.columns if col not in special_cols]
     non_key_cols = [col for col in all_cols if col not in key_cols]
-    current_datetime = datetime.now()
     current_datetime_string = f"'{current_datetime}'"
 
     logs.log_debug(f"all_cols: {all_cols}")

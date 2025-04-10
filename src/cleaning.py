@@ -149,14 +149,6 @@ SchemaTypeUnion = Union[
 ]
 
 
-def get_renamed_key_columns(schema: dict[str, SchemaTypeUnion]) -> List[str]:
-    return [
-        schema_type.rename_to if schema_type.rename_to is not None else col_name
-        for col_name, schema_type in schema.items()
-        if schema_type.key
-    ]
-
-
 def get_key_columns(schema: dict[str, SchemaTypeUnion]) -> List[str]:
     return [col_name for col_name, schema_type in schema.items() if schema_type.key]
 
@@ -431,9 +423,27 @@ def _get_col_cleaner(schema_type: SchemaTypeUnion) -> callable:
     return None
 
 
+class Result:
+    value: DataFrame | ConnectDataFrame
+    renamed_cols: dict[str, str]
+
+    def __init__(
+        self,
+        value: DataFrame | ConnectDataFrame,
+        renamed_cols: dict[str, str],
+    ):
+
+        assert isinstance(value, (DataFrame, ConnectDataFrame))
+        assert isinstance(renamed_cols, dict)
+
+        self.value = value
+        self.renamed_cols = renamed_cols
+
+
 def clean_table(
-    df: DataFrame | ConnectDataFrame, schema: dict[str, SchemaTypeUnion]
-) -> DataFrame | ConnectDataFrame:
+    df: DataFrame | ConnectDataFrame,
+    schema: dict[str, SchemaTypeUnion],
+) -> Result:
     """
     Handles the following tasks:
     - Trims all string columns
@@ -522,7 +532,7 @@ def clean_table(
 
     logs.log_info("Renaming columns...")
 
-    rename_mapping = dict()
+    rename_mapping: dict[str, str] = {}
 
     for col in df.columns:
 
@@ -545,4 +555,7 @@ def clean_table(
 
     logs.log_success(f"Renaming columns done.")
 
-    return df
+    return Result(
+        value=df,
+        renamed_cols=rename_mapping,
+    )

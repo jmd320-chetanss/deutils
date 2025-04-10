@@ -27,9 +27,6 @@ def raw_to_prep(
     - ignore_fivetran_logic: bool, whether to ignore Fivetran logic
     """
 
-    key_cols = cleaning.get_renamed_key_columns(schema)
-    assert len(key_cols) > 0, "No key columns found in schema"
-
     source_df = spark_utils.read_table(spark_session, source_table_path)
     target_df = spark_utils.read_table(spark_session, target_table_path, if_exists=True)
 
@@ -45,14 +42,30 @@ def raw_to_prep(
             f"Removing Fivetran logic from source done, removed {removed_count} records."
         )
 
-    cleaned_df = cleaning.clean_table(
+    cleaning_result = cleaning.clean_table(
         df=source_df,
         schema=schema,
     )
 
+    # Fetch the list of key columns from the cleaning schema
+    key_cols = [col for col in schema.keys() if schema[col].key is True]
+
+    if len(key_cols) == 0:
+        raise ValueError("No key columns found in schema")
+
+    # Update the key columns with renamed columns if it is renamed
+    key_cols = [
+        (
+            cleaning_result.renamed_cols[col]
+            if col in cleaning_result.renamed_cols
+            else col
+        )
+        for col in key_cols
+    ]
+
     scd_df = scd2.calculate(
         spark_session=spark_session,
-        source_df=cleaned_df,
+        source_df=cleaning_result.value,
         target_df=target_df,
         key_cols=key_cols,
     )

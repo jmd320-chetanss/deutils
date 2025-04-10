@@ -46,6 +46,10 @@ class SchemaType:
         key: bool = False
 
     @dataclass
+    class Null(_Base):
+        pass
+
+    @dataclass
     class Auto(_Base):
         pass
 
@@ -138,11 +142,12 @@ class SchemaType:
     @dataclass
     class Enum(String):
         # The possible values for the enum
-        values: List[str]
+        values: List[str] = field(default_factory=list)
 
 
 # For easy access using python modules
 Auto = SchemaType.Auto
+Null = SchemaType.Null
 String = SchemaType.String
 Bool = SchemaType.Bool
 Signed = SchemaType.Signed
@@ -173,6 +178,9 @@ def get_key_columns(schema: dict[str, SchemaTypeUnion]) -> List[str]:
 def get_unique_columns(schema: dict[str, SchemaTypeUnion]) -> List[str]:
     return [col_name for col_name, schema_type in schema.items() if schema_type.unique]
 
+
+def _get_null_cleaner(schema_type: SchemaType.Null) -> callable:
+    return lambda col: spf.col(col).cast("string")
 
 def _get_case_updater(case: str) -> callable:
     match case:
@@ -418,6 +426,9 @@ def _get_enum_cleaner(schema_type: SchemaType.Enum) -> callable:
 
 
 def _get_col_cleaner(schema_type: SchemaTypeUnion) -> callable:
+
+    if isinstance(schema_type, SchemaType.Null):
+        return _get_null_cleaner(schema_type)
 
     if isinstance(schema_type, SchemaType.Auto):
         return _get_auto_cleaner(schema_type)

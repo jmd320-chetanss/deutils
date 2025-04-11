@@ -19,6 +19,7 @@ def raw_to_prep(
     schema: dict[str, cleaning.SchemaTypeUnion],
     ignore_fivetran_logic: bool = True,
     add_load_datetime: bool = True,
+    drop_complete_duplicates: bool = False,
 ):
     """
     Promotes raw table to prep table.
@@ -52,6 +53,7 @@ def raw_to_prep(
     cleaning_result = cleaning.clean_table(
         df=source_df,
         schema=schema,
+        drop_complete_duplicates=drop_complete_duplicates,
     )
 
     # Fetch the list of key columns from the cleaning schema

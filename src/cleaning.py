@@ -161,6 +161,10 @@ Currency = SchemaType.Currency
 Date = SchemaType.Date
 Datetime = SchemaType.Datetime
 Gender = SchemaType.Gender
+Phone = SchemaType.Phone
+Email = SchemaType.Email
+Enum = SchemaType.Enum
+Drop = SchemaType.Drop
 
 SchemaTypeUnion = Union[
     SchemaType.Auto,
@@ -172,18 +176,32 @@ SchemaTypeUnion = Union[
     SchemaType.Date,
     SchemaType.Datetime,
     SchemaType.Gender,
+    SchemaType.Phone,
+    SchemaType.Email,
+    SchemaType.Enum,
+    SchemaType.Drop,
 ]
 
 
 def get_key_columns(schema: dict[str, SchemaTypeUnion]) -> List[str]:
-    return [col_name for col_name, schema_type in schema.items() if schema_type.key]
+    return [
+        col_name
+        for col_name, schema_type in schema.items()
+        if not isinstance(schema_type, SchemaType.Drop) and schema_type.key
+    ]
 
 
 def get_unique_columns(schema: dict[str, SchemaTypeUnion]) -> List[str]:
-    return [col_name for col_name, schema_type in schema.items() if schema_type.unique]
+    return [
+        col_name
+        for col_name, schema_type in schema.items()
+        if not isinstance(schema_type, SchemaType.Drop) and schema_type.unique
+    ]
+
 
 def _get_null_cleaner(schema_type: SchemaType.Null) -> callable:
     return lambda col: spf.col(col).cast("string")
+
 
 def _get_case_updater(case: str) -> callable:
     match case:
@@ -489,6 +507,7 @@ class Result:
 def clean_table(
     df: DataFrame | ConnectDataFrame,
     schema: dict[str, SchemaTypeUnion],
+    drop_complete_duplicates: bool = False,
 ) -> Result:
     """
     Handles the following tasks:
@@ -534,6 +553,19 @@ def clean_table(
         df = df.withColumn(col, cleaner(col))
 
     logs.log_success("Cleaning columns done.")
+
+    # -----------------------------------------------------------------------------------------------------
+    # Dropping complete duplicates
+    # -----------------------------------------------------------------------------------------------------
+
+    if drop_complete_duplicates:
+        logs.log_info("Dropping complete duplicates...")
+
+        before_drop_count = df.count()
+        df = df.dropDuplicates()
+        drop_count = before_drop_count - df.count()
+
+        logs.log_success(f"Dropping complete duplicates done, dropped {drop_count}.")
 
     # -----------------------------------------------------------------------------------------------------
     # Checking for unique columns

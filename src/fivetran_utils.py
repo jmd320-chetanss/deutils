@@ -22,16 +22,13 @@ def remove_fivetran_logic(
         DataFrame | ConnectDataFrame: A DataFrame with fivetran deleted records removed.
     """
 
-    if "_fivetran_deleted" not in df.columns:
-        return df
-
     columns = [col for col in df.columns if not col.startswith("_fivetran")]
 
     return spark_session.sql(
         f"""
-        SELECT { ", ".join(columns) }
-        FROM {{source}}
-        WHERE _fivetran_deleted = FALSE
+        select { ", ".join(columns) }
+        from {{source}}
+        { "where _fivetran_deleted is false" if "_fivetran_deleted" in df.columns else "" }
         """,
         source=df,
     )

@@ -490,11 +490,13 @@ def _get_col_cleaner(schema_type: SchemaTypeUnion) -> callable:
 class Result:
     value: DataFrame | ConnectDataFrame
     renamed_cols: dict[str, str]
+    key_cols: str
 
     def __init__(
         self,
         value: DataFrame | ConnectDataFrame,
         renamed_cols: dict[str, str],
+        key_cols: str,
     ):
 
         assert isinstance(value, (DataFrame, ConnectDataFrame))
@@ -502,6 +504,7 @@ class Result:
 
         self.value = value
         self.renamed_cols = renamed_cols
+        self.key_cols = key_cols
 
 
 def clean_table(
@@ -592,19 +595,19 @@ def clean_table(
 
     logs.log_info("Checking for key columns...")
 
-    key_columns = get_key_columns(schema)
-    if key_columns:
-        duplicates_df = df.groupBy(key_columns).count().filter(spf.col("count") > 1)
+    key_cols = get_key_columns(schema)
+    if key_cols:
+        duplicates_df = df.groupBy(key_cols).count().filter(spf.col("count") > 1)
         are_unique = duplicates_df.isEmpty()
 
         if not are_unique:
-            if len(key_columns) > 1:
+            if len(key_cols) > 1:
                 raise ValueError(
-                    f"Composite key columns {key_columns} have duplicate values."
+                    f"Composite key columns {key_cols} have duplicate values."
                 )
             else:
                 raise ValueError(
-                    f"Primary key column {key_columns} have duplicate values."
+                    f"Primary key column {key_cols} have duplicate values."
                 )
 
     logs.log_success("Checking for key columns done.")
@@ -638,7 +641,11 @@ def clean_table(
 
     logs.log_success(f"Renaming columns done.")
 
+    # The new names of the key columns after they are renamed
+    renamed_key_cols = [rename_mapping.get(col, col) for col in key_cols]
+
     return Result(
         value=df,
         renamed_cols=rename_mapping,
+        key_cols=renamed_key_cols,
     )

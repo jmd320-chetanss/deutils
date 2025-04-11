@@ -56,21 +56,8 @@ def raw_to_prep(
         drop_complete_duplicates=drop_complete_duplicates,
     )
 
-    # Fetch the list of key columns from the cleaning schema
-    key_cols = [col for col in schema.keys() if schema[col].key is True]
-
-    if len(key_cols) == 0:
+    if len(cleaning_result.key_cols) == 0:
         raise ValueError("No key columns found in schema")
-
-    # Update the key columns with renamed columns if it is renamed
-    key_cols = [
-        (
-            cleaning_result.renamed_cols[col]
-            if col in cleaning_result.renamed_cols
-            else col
-        )
-        for col in key_cols
-    ]
 
     logs.log_success(f"Cleaning source done.")
 
@@ -81,7 +68,7 @@ def raw_to_prep(
         spark_session=spark_session,
         source_df=cleaning_result.value,
         target_df=target_df,
-        key_cols=key_cols,
+        key_cols=cleaning_result.key_cols,
         current_datetime=current_datetime,
     )
 

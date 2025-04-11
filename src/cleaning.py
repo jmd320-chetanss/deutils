@@ -46,6 +46,10 @@ class SchemaType:
         key: bool = False
 
     @dataclass
+    class Drop:
+        pass
+
+    @dataclass
     class Null(_Base):
         pass
 
@@ -177,7 +181,6 @@ def get_key_columns(schema: dict[str, SchemaTypeUnion]) -> List[str]:
 
 def get_unique_columns(schema: dict[str, SchemaTypeUnion]) -> List[str]:
     return [col_name for col_name, schema_type in schema.items() if schema_type.unique]
-
 
 def _get_null_cleaner(schema_type: SchemaType.Null) -> callable:
     return lambda col: spf.col(col).cast("string")
@@ -427,7 +430,7 @@ def _get_enum_cleaner(schema_type: SchemaType.Enum) -> callable:
 
 def _get_col_cleaner(schema_type: SchemaTypeUnion) -> callable:
 
-    if isinstance(schema_type, SchemaType.Null):
+    if isinstance(schema_type, (SchemaType.Null, SchemaType.Drop)):
         return _get_null_cleaner(schema_type)
 
     if isinstance(schema_type, SchemaType.Auto):
@@ -439,16 +442,10 @@ def _get_col_cleaner(schema_type: SchemaTypeUnion) -> callable:
     if isinstance(schema_type, SchemaType.Bool):
         return _get_bool_cleaner(schema_type)
 
-    if isinstance(schema_type, SchemaType.Signed):
+    if isinstance(schema_type, (SchemaType.Signed, SchemaType.Unsigned)):
         return _get_int_cleaner(schema_type)
 
-    if isinstance(schema_type, SchemaType.Unsigned):
-        return _get_int_cleaner(schema_type)
-
-    if isinstance(schema_type, SchemaType.Decimal):
-        return _get_decimal_cleaner(schema_type)
-
-    if isinstance(schema_type, SchemaType.Currency):
+    if isinstance(schema_type, (SchemaType.Decimal, SchemaType.Currency)):
         return _get_decimal_cleaner(schema_type)
 
     if isinstance(schema_type, SchemaType.Date):
@@ -520,6 +517,11 @@ def clean_table(
         logs.log_debug(
             f"Setting data type of '{col}' to '{misc_utils.get_type_name(schema_type)}'..."
         )
+
+        if isinstance(schema_type, SchemaType.Drop):
+            logs.log_info(f"Dropping column '{col}'...")
+            df = df.drop(col)
+            continue
 
         cleaner = _get_col_cleaner(schema_type)
         if cleaner is None:

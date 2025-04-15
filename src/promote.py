@@ -82,7 +82,7 @@ def raw_to_prep(
             "_loaded_at", spf.lit(current_datetime).cast("timestamp")
         )
 
-        logs.log_info(f"Adding load datetime to SCD2 table done.")
+        logs.log_success(f"Adding load datetime to SCD2 table done.")
 
     logs.log_info(f"Writing to {target_table_path}...")
 

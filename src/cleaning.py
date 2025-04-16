@@ -140,6 +140,14 @@ class SchemaType:
         include_country_code: bool = True
 
     @dataclass
+    class Uuid(_Base):
+        pass
+
+    @dataclass
+    class Postcode(_Base):
+        pass
+
+    @dataclass
     class Email(_Base):
         pass
 
@@ -164,6 +172,8 @@ Gender = SchemaType.Gender
 Phone = SchemaType.Phone
 Email = SchemaType.Email
 Enum = SchemaType.Enum
+Uuid = SchemaType.Uuid
+Postcode = SchemaType.Postcode
 Drop = SchemaType.Drop
 
 SchemaTypeUnion = Union[
@@ -180,6 +190,8 @@ SchemaTypeUnion = Union[
     SchemaType.Email,
     SchemaType.Enum,
     SchemaType.Drop,
+    SchemaType.Uuid,
+    SchemaType.Postcode,
 ]
 
 
@@ -439,7 +451,15 @@ def _get_phone_cleaner(schema_type: SchemaType.Datetime) -> callable:
 
 
 def _get_email_cleaner(schema_type: SchemaType.Email) -> callable:
-    return _get_string_cleaner(SchemaType.String())
+    return _get_string_cleaner(SchemaType.String(case="lower"))
+
+
+def _get_uuid_cleaner(schema_type: SchemaType.Uuid) -> callable:
+    return _get_string_cleaner(SchemaType.String(case="upper"))
+
+
+def _get_postcode_cleaner(schema_type: SchemaType.Postcode) -> callable:
+    return _get_string_cleaner(SchemaType.String(case="upper"))
 
 
 def _get_enum_cleaner(schema_type: SchemaType.Enum) -> callable:
@@ -483,6 +503,12 @@ def _get_col_cleaner(schema_type: SchemaTypeUnion) -> callable:
 
     if isinstance(schema_type, SchemaType.Enum):
         return _get_enum_cleaner(schema_type)
+
+    if isinstance(schema_type, SchemaType.Uuid):
+        return _get_uuid_cleaner(schema_type)
+
+    if isinstance(schema_type, SchemaType.Postcode):
+        return _get_postcode_cleaner(schema_type)
 
     return None
 

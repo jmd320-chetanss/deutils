@@ -56,33 +56,38 @@ def raw_to_prep(
         drop_complete_duplicates=drop_complete_duplicates,
     )
 
-    if len(cleaning_result.key_cols) == 0:
-        raise ValueError("No key columns found in schema")
-
     logs.log_success(f"Cleaning source done.")
+
+    # Adding load timestamp
+    cleaned_df = cleaning_result.value
+    current_datetime = datetime.now()
+    if add_load_datetime:
+        logs.log_info(f"Adding load timestamp...")
+
+        cleaned_df = cleaned_df.withColumn(
+            "_loaded_at", spf.lit(current_datetime).cast("timestamp")
+        )
+
+        cleaned_df = cleaned_df.withColumn(
+            "_created_at", spf.lit(current_datetime).cast("timestamp")
+        )
+
+        logs.log_success(f"Adding load timestamp done.")
 
     logs.log_info(f"Generating SCD2 table from source...")
 
-    current_datetime = datetime.now()
+    if len(cleaning_result.key_cols) == 0:
+        raise ValueError("No key columns found in schema")
+
     scd_df = scd2.calculate(
         spark_session=spark_session,
-        source_df=cleaning_result.value,
+        source_df=cleaned_df,
         target_df=target_df,
         key_cols=cleaning_result.key_cols,
         current_datetime=current_datetime,
     )
 
     logs.log_info(f"Generating SCD2 table from source done.")
-
-    if add_load_datetime:
-
-        logs.log_info(f"Adding load datetime to SCD2 table...")
-
-        scd_df = scd_df.withColumn(
-            "_loaded_at", spf.lit(current_datetime).cast("timestamp")
-        )
-
-        logs.log_success(f"Adding load datetime to SCD2 table done.")
 
     logs.log_info(f"Writing to {target_table_path}...")
 

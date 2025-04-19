@@ -52,7 +52,7 @@ def raw_to_prep(
 
     cleaning_result = cleaning.clean_table(
         df=source_df,
-        schema=schema,
+        cleaners=schema,
         drop_complete_duplicates=drop_complete_duplicates,
     )
 

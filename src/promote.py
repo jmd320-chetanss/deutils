@@ -10,13 +10,14 @@ from . import cleaning
 from . import spark_utils
 from . import fivetran_utils
 from . import scd2
+from .cleaners.ColCleaner import ColCleaner
 
 
 def raw_to_prep(
     spark_session: SparkSession,
     source_table_path: str,
     target_table_path: str,
-    schema: dict[str, cleaning.SchemaTypeUnion],
+    schema: dict[str, ColCleaner],
     ignore_fivetran_logic: bool = True,
     add_load_datetime: bool = True,
     drop_complete_duplicates: bool = False,
@@ -27,7 +28,7 @@ def raw_to_prep(
     Parameters:
     - source_table_path: str, path to source table
     - target_table_path: str, path to target table
-    - schema: dict[str, SchemaTypeUnion], schema of source table
+    - schema: dict[str, ColCleaner], schema of source table
     - ignore_fivetran_logic: bool, whether to ignore Fivetran logic
     """
 

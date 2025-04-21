@@ -24,8 +24,6 @@ class IntCleaner(ColCleaner):
         Clean the integer value by removing non-numeric characters and converting to int.
         """
 
-        integer_type = "signed" if self.min_value < 0 else "unsigned"
-
         def cleaner(value: str | None):
             if value is not None and value.strip() == "" and self.empty_to_null:
                 value = None
@@ -39,7 +37,7 @@ class IntCleaner(ColCleaner):
             parsed_value = math_utils.parse_int(value)
 
             if parsed_value is None:
-                raise ValueError(f"Cannot parse '{value}' as {integer_type} integer.")
+                raise ValueError(f"Cannot parse '{value}' as integer.")
 
             if self.min_value is not None and parsed_value < self.min_value:
                 raise ValueError(

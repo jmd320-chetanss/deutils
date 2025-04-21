@@ -1,6 +1,6 @@
 from dataclasses import dataclass
-from typing import Literal
 from .ColCleaner import ColCleaner
+from typing import List
 
 
 @dataclass
@@ -8,12 +8,14 @@ class BoolCleaner(ColCleaner):
     """
     A class to clean boolean values.
     """
+    from dataclasses import field
 
-    # How to represent boolean values
-    mode: Literal["truefalse", "tf", "yesno", "yn", "01"] = "truefalse"
-
-    # Should the output format be in lowercase
-    lower: bool = False
+    true_cases: List[str] = field(default_factory=lambda: ["true", "t", "yes", "y", "on", "1"])
+    false_cases: List[str] = field(default_factory=lambda: ["false", "f", "no", "n", "off", "0"])
+    extra_true_cases: List[str] = field(default_factory=list)
+    extra_false_cases: List[str] = field(default_factory=list)
+    true_value: str = "True"
+    false_value: str = "False"
 
     def __post_init__(self):
         self.datatype = "boolean"
@@ -23,7 +25,10 @@ class BoolCleaner(ColCleaner):
         Cleans the input string and converts it to a boolean value.
         """
 
-        def cleaner(value: str | None):
+        true_cases = self.true_cases + self.extra_true_cases
+        false_cases = self.false_cases + self.extra_false_cases
+
+        def cleaner(value: str | None) -> str | None:
             if value is not None and value.strip() == "" and self.empty_to_null:
                 value = None
 
@@ -34,31 +39,12 @@ class BoolCleaner(ColCleaner):
                     raise ValueError("Value cannot be null")
 
             value_clean = value.lower().strip()
-            istrue = value_clean in ["true", "t", "yes", "y", "on", "1"]
-            isfalse = value_clean in ["false", "f", "no", "n", "off", "0"]
+            istrue = value_clean in true_cases
+            isfalse = value_clean in false_cases
 
             if not istrue and not isfalse:
-                raise ValueError(f"Cannot parse '{value}' as boolean")
+                raise ValueError(f"Cannot parse '{value}' as boolean.")
 
-            if self.mode == "truefalse":
-                result = "True" if istrue else "False"
-                return result.tolower() if self.lower else result
-
-            if self.mode == "tf":
-                result = "T" if istrue else "F"
-                return result.tolower() if self.lower else result
-
-            if self.mode == "yesno":
-                result = "Yes" if istrue else "No"
-                return result.tolower() if self.lower else result
-
-            if self.mode == "yn":
-                result = "Y" if istrue else "N"
-                return result.tolower() if self.lower else result
-
-            if self.mode == "01":
-                return "1" if istrue else "0"
-
-            raise ValueError(f"Invalid mode '{self.mode}'")
+            return self.true_value if istrue else self.false_value
 
         return cleaner

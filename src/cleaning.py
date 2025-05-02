@@ -42,8 +42,8 @@ class CurrencyCleaner(FloatCleaner):
     """
 
     def __post_init__(self):
-        super().__post_init__()
         self.precision = 3
+        super().__post_init__()
 
 
 @dataclass
@@ -55,6 +55,7 @@ class DateCleaner(DatetimeCleaner):
     def __post_init__(self):
         super().__post_init__()
         self.format = "%Y-%m-%d"
+        self.datatype = "date"
 
 
 # For easy access using python modules

@@ -30,7 +30,7 @@ class DatetimeCleaner(ColCleaner):
         elif isinstance(parse_formats, str):
             parse_formats = [parse_formats]
 
-        def cleaner(value: str | None) -> date | None:
+        def cleaner(value: str | None) -> str | None:
             if value is not None and value.strip() == "" and self.empty_to_null:
                 value = None
 
@@ -45,6 +45,6 @@ class DatetimeCleaner(ColCleaner):
             except (ValueError, TypeError):
                 raise ValueError(f"Cannot parse {type(value)} '{value}' as date")
 
-            return parsed_value
+            return parsed_value.strftime(self.format)
 
         return cleaner

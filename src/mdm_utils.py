@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from typing import Callable
 from dataclasses import dataclass, field
 from pyspark.sql import SparkSession, DataFrame
 from pyspark.sql.connect.dataframe import DataFrame as ConnectDataFrame
@@ -28,7 +29,6 @@ class PowerMasterRecordSelector(MasterRecordSelector):
 
     powers: dict[str, int] = field(default_factory=dict)
 
-
     def select_masters(
         self,
         spark_session: SparkSession | ConnectSparkSession,
@@ -37,7 +37,6 @@ class PowerMasterRecordSelector(MasterRecordSelector):
         key_cols: list[str],
         master_col_prefix: str = "master_",
     ) -> DataFrame | ConnectDataFrame:
-
         """
         Abstract method to select master records from a DataFrame or ConnectDataFrame.
 
@@ -85,6 +84,7 @@ class PowerMasterRecordSelector(MasterRecordSelector):
 
         return master_df
 
+
 def _validate_key_cols(
     spark_session: SparkSession | ConnectSparkSession,
     df: DataFrame | ConnectDataFrame,
@@ -105,6 +105,12 @@ def _validate_key_cols(
     return composite_key_check_df.count() == 0
 
 
+@dataclass
+class MDMResult:
+    result: DataFrame | ConnectDataFrame
+    get_analysis: Callable[[], DataFrame | ConnectDataFrame]
+
+
 def generate_mdm(
     spark_session: SparkSession | ConnectSparkSession,
     df: DataFrame | ConnectDataFrame,
@@ -112,10 +118,10 @@ def generate_mdm(
     blocking_rules: list,
     comparisions: list,
     master_record_selector: MasterRecordSelector,
-    db_api = DuckDBAPI(),
-    threshold_match_probability = .9,
+    db_api=DuckDBAPI(),
+    threshold_match_probability=0.9,
     master_col_prefix: str = "master_",
-) -> DataFrame | ConnectDataFrame:
+) -> MDMResult:
     """
     Generate master records using the PowerMasterRecordSelector.
 
@@ -128,16 +134,28 @@ def generate_mdm(
     :return: DataFrame or ConnectDataFrame with master records selected.
     """
 
-    assert isinstance(spark_session, (SparkSession, ConnectSparkSession)), "spark_session must be a SparkSession or ConnectSparkSession instance"
-    assert isinstance(df, (DataFrame, ConnectDataFrame)), "df must be a DataFrame or ConnectDataFrame instance"
-    assert isinstance(key_cols, list) and all(isinstance(col, str) for col in key_cols), "key_cols must be a list of strings"
+    assert isinstance(
+        spark_session, (SparkSession, ConnectSparkSession)
+    ), "spark_session must be a SparkSession or ConnectSparkSession instance"
+    assert isinstance(
+        df, (DataFrame, ConnectDataFrame)
+    ), "df must be a DataFrame or ConnectDataFrame instance"
+    assert isinstance(key_cols, list) and all(
+        isinstance(col, str) for col in key_cols
+    ), "key_cols must be a list of strings"
     assert len(key_cols) > 0, "key_cols must contain at least one column"
     assert isinstance(blocking_rules, list), "blocking_rules must be a list"
     assert isinstance(comparisions, list), "comparisions must be a list"
-    assert isinstance(master_record_selector, MasterRecordSelector), "master_record_selector must be an instance of MasterRecordSelector"
-    assert isinstance(threshold_match_probability, (float, int)), "threshold_match_probability must be a float or int"
+    assert isinstance(
+        master_record_selector, MasterRecordSelector
+    ), "master_record_selector must be an instance of MasterRecordSelector"
+    assert isinstance(
+        threshold_match_probability, (float, int)
+    ), "threshold_match_probability must be a float or int"
     assert isinstance(master_col_prefix, str), "master_col_prefix must be a string"
-    assert _validate_key_cols(spark_session, df, key_cols), "key_cols must represent unique records"
+    assert _validate_key_cols(
+        spark_session, df, key_cols
+    ), "key_cols must represent unique records"
 
     # --------------------------------------------------------------------------
     # Generate a unique id col for splink, splink does not support
@@ -156,7 +174,7 @@ def generate_mdm(
             spark_session=spark_session,
             df=df,
             key_cols=key_cols,
-            composite_key_col=unique_id_col_name
+            composite_key_col=unique_id_col_name,
         )
 
     # --------------------------------------------------------------------------
@@ -164,7 +182,6 @@ def generate_mdm(
     # --------------------------------------------------------------------------
 
     source_pandas_df = df.toPandas()
-    other_cols = [col for col in df.columns if col not in key_cols]
 
     # Defining the match configuration
     settings = SettingsCreator(
@@ -221,4 +238,52 @@ def generate_mdm(
     # been selected.
     master_df = master_df.drop("cluster_id")
 
-    return master_df
+    # --------------------------------------------------------------------------
+    # Get analysis function
+    # --------------------------------------------------------------------------
+
+    def get_anaylsis():
+
+        master_cols = [f"{master_col_prefix}{col}" for col in key_cols]
+        other_cols = [
+            col for col in master_df.columns if col not in (key_cols + master_cols)
+        ]
+
+        analysis_sql = f"""
+            with master as (
+                select *
+                from {{master}}
+            )
+
+            , counts as (
+                select
+                    { ", ".join(master_cols) }
+                    , count(*) as count
+                from master
+                group by all
+            )
+
+            select
+                counts.count as cluster_count
+                , { ", ".join([ f"master.{col}" for col in key_cols ]) }
+                , { ", ".join([ f"master.{col}" for col in master_cols ]) }
+                , { ", ".join([ f"master.{col}" for col in other_cols ]) }
+            from master
+            left join counts
+                on { " and ".join([ f"master.{col} = counts.{col}" for col in master_cols ])  }
+            order by
+                counts.count desc
+                , { ", ".join([ f"master.{col}" for col in master_cols ]) }
+        """
+
+        analysis_df = spark_session.sql(
+            analysis_sql,
+            master=master_df,
+        )
+
+        return analysis_df
+
+    return MDMResult(
+        result=master_df,
+        get_analysis=get_anaylsis,
+    )
